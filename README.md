@@ -12,7 +12,7 @@
 ├── demo.ps1                                         # 一条端到端演示命令
 ├── pyproject.toml                                   # 构建/依赖/pytest 配置
 ├── .env.example                                     # 环境变量模板
-├── README.md / PROJECT_BRIEF.md / PROJECT_GUIDE.md  # 说明 / 章程 / 实施指南
+├── README.md / PROJECT_BRIEF.md                     # 说明 / 章程
 ├── config/
 │   ├── settings.py                                  # Pydantic Settings：全部配置项与默认值
 │   └── __init__.py                                  # 导出 Settings / get_settings
