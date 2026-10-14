@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>文献检索 Agent</title>
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+  <style>
+    :root {
+      --bg: #08111f; --panel: #101d2f; --panel-2: #14243a; --line: #233750;
+      --text: #edf5ff; --muted: #8fa5bf; --accent: #64d5ff; --orange: #ffb45c;
+      --green: #8ce6bd; --danger: #ff7f8f; --shadow: 0 18px 50px #02071288;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 15% 0%, #163356 0, var(--bg) 40%); color: var(--text); font: 14px/1.6 Inter, "Microsoft YaHei", sans-serif; }
+    button, input { font: inherit; }
+    .topbar { height: 74px; display: flex; align-items: center; gap: 24px; padding: 0 28px; border-bottom: 1px solid var(--line); background: #08111fe8; backdrop-filter: blur(18px); position: sticky; top: 0; z-index: 4; }
+    .brand { font-weight: 800; letter-spacing: .04em; white-space: nowrap; font-size: 18px; }
+    .brand span { color: var(--accent); }
+    .search { display: flex; flex: 1; max-width: 760px; gap: 10px; margin-left: auto; }
+    .search input { flex: 1; min-width: 120px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; outline: none; }
+    .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #64d5ff22; }
+    .primary { border: 0; border-radius: 12px; padding: 0 22px; background: linear-gradient(135deg, #55d7ff, #7e8cff); color: #07101e; font-weight: 800; cursor: pointer; }
+    .primary:disabled { opacity: .55; cursor: wait; }
+    .layout { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(360px, 1.25fr) minmax(300px, 1fr); gap: 14px; padding: 16px; max-width: 1800px; margin: 0 auto; }
+    .panel { min-height: calc(100vh - 160px); background: linear-gradient(180deg, #102039dd, #0c1728ee); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+    .panel-title { font-weight: 800; font-size: 15px; }
+    .panel-title small { color: var(--accent); margin-right: 8px; }
+    .panel-body { padding: 14px; }
+    .muted { color: var(--muted); }
+    .status { color: var(--muted); font-size: 12px; }
+    .paper-card { padding: 15px; margin-bottom: 10px; border: 1px solid transparent; border-radius: 14px; background: #13243a; cursor: pointer; transition: .2s ease; }
+    .paper-card:hover, .paper-card.active { border-color: var(--accent); transform: translateY(-1px); background: #18304a; }
+    .paper-card h3 { margin: 0 0 8px; font-size: 14px; line-height: 1.45; }
+    .meta { color: var(--muted); font-size: 12px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .abstract { color: #c2d1e3; font-size: 12px; margin: 10px 0 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .chip { color: var(--accent); border: 1px solid #64d5ff55; border-radius: 99px; padding: 1px 8px; font-size: 11px; }
+    .review { min-height: 390px; padding: 20px; color: #dce9f7; font-size: 16px; white-space: pre-wrap; }
+    .review .citation { color: var(--accent); border: 0; background: transparent; padding: 0 3px; cursor: pointer; font-weight: 800; }
+    .review .citation:hover { text-decoration: underline; }
+    #citation-graph { width: 100%; height: 530px; }
+    .legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+    .dot.blue { background: var(--accent); } .dot.orange { background: var(--orange); } .dot.seed { background: var(--green); }
+    .metrics { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 12px 24px; border-top: 1px solid var(--line); color: var(--muted); background: #08111f; }
+    .metric strong { color: var(--text); margin-left: 5px; }
+    .metric .good { color: var(--green); }
+    .empty, .error { padding: 38px 18px; text-align: center; color: var(--muted); }
+    .error { color: var(--danger); }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr 1fr; } .graph-panel { grid-column: span 2; min-height: 540px; } }
+    @media (max-width: 720px) { .topbar { height: auto; padding: 14px; flex-wrap: wrap; gap: 12px; } .search { order: 2; flex-basis: 100%; } .layout { grid-template-columns: 1fr; padding: 10px; } .graph-panel { grid-column: auto; } .panel { min-height: auto; } #citation-graph { height: 420px; } }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🔍 文献检索 <span>Agent</span></div>
+    <form class="search" id="search-form">
+      <input id="query" placeholder="输入研究问题，例如：retrieval augmented generation" autocomplete="off">
+      <button class="primary" id="search-button">搜索</button>
+    </form>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><small>①</small>推荐文献</div><span class="status" id="search-status">等待搜索</span></div>
+      <div class="panel-body" id="papers"><div class="empty">输入研究问题开始检索</div></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div class="panel-title"><small>②</small>AI 综述 / 推荐理由</div><span class="status" id="stream-status">就绪</span></div>
+      <div class="review" id="review"><span class="muted">综述将在搜索后流式生成。</span></div>
+    </section>
+    <section class="panel graph-panel">
+      <div class="panel-head">
+        <div class="panel-title"><small>③</small>引用图谱</div>
+        <div class="legend"><span><i class="dot seed"></i>种子</span><span><i class="dot blue"></i>参考</span><span><i class="dot orange"></i>被引</span></div>
+      </div>
+      <div id="citation-graph"><div class="empty">搜索后加载引用关系</div></div>
+    </section>
+  </main>
+
+  <footer class="metrics">
+    <span class="metric">模式<strong id="eval-mode">—</strong></span>
+    <span class="metric">溯源率<strong class="good" id="faithfulness">—</strong></span>
+    <span class="metric">上下文召回<strong class="good" id="context-recall">—</strong></span>
+    <span class="metric">缓存<strong id="cache-status">—</strong></span>
+  </footer>
+
+  <script>
+    const state = { papers: [], graph: null, nodes: new Map(), edges: [], loading: false };
+    const $ = (id) => document.getElementById(id);
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const formatCount = (n) => n == null ? '—' : Intl.NumberFormat('zh-CN', { notation: 'compact' }).format(n);
+
+    $('search-form').addEventListener('submit', (event) => { event.preventDefault(); search(); });
+
+    async function search() {
+      const query = $('query').value.trim();
+      if (!query || state.loading) return;
+      state.loading = true; $('search-button').disabled = true; $('search-status').textContent = '检索中…';
+      $('papers').innerHTML = '<div class="empty">正在连接 OpenAlex…</div>';
+      $('review').innerHTML = '<span class="muted">准备流式生成综述…</span>';
+      try {
+        const response = await fetch('/api/search', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, limit: 10}) });
+        const data = await response.json();
+        state.papers = data.papers || [];
+        renderPapers(data.error);
+        if (state.papers[0]) {
+          await loadGraph(state.papers[0].paper_id);
+          streamSummary(query);
+        }
+        $('search-status').textContent = `${state.papers.length} 篇`;
+      } catch (error) {
+        $('papers').innerHTML = `<div class="error">检索失败：${escapeHtml(error.message)}</div>`;
+        $('search-status').textContent = '失败';
+      } finally { state.loading = false; $('search-button').disabled = false; }
+    }
+
+    function renderPapers(error) {
+      if (error && !state.papers.length) { $('papers').innerHTML = `<div class="error">${escapeHtml(error)}</div>`; return; }
+      if (!state.papers.length) { $('papers').innerHTML = '<div class="empty">没有找到匹配文献</div>'; return; }
+      $('papers').innerHTML = state.papers.map((paper, index) => `
+        <article class="paper-card" id="paper-${index}" data-id="${escapeHtml(paper.paper_id)}" onclick="focusPaper('${escapeHtml(paper.paper_id)}')">
+          <h3>${escapeHtml(paper.title || '未命名论文')}</h3>
+          <div class="meta"><span>${paper.year || '年份未知'}</span><span>被引 ${formatCount(paper.cited_by_count)}</span></div>
+          <div class="abstract">${escapeHtml(paper.abstract || '暂无摘要')}</div>
+          <div class="chips"><span class="chip">${escapeHtml(paper.source || 'academic source')}</span><span class="chip">查看引用 →</span></div>
+        </article>`).join('');
+    }
+
+    async function streamSummary(query) {
+      $('stream-status').textContent = '生成中…'; $('review').innerHTML = '';
+      const response = await fetch('/api/summarize', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({query, limit: 10}) });
+      const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
+      while (true) {
+        const {value, done} = await reader.read(); if (done) break;
+        buffer += decoder.decode(value, {stream: true});
+        const events = buffer.split('\n\n'); buffer = events.pop();
+        events.forEach(handleSse);
+      }
+      if (buffer) handleSse(buffer); $('stream-status').textContent = '完成';
+    }
+
+    function handleSse(raw) {
+      const event = raw.match(/event: ([^\n]+)/)?.[1]; const dataLine = raw.match(/data: (.+)/)?.[1]; if (!dataLine) return;
+      const data = JSON.parse(dataLine);
+      if (event === 'token') appendReview(data.text);
+      if (event === 'citations') window.reviewRefs = data.refs || [];
+      if (event === 'done') updateMetrics(data);
+    }
+
+    function appendReview(text) {
+      const review = $('review'); review.textContent += text;
+      review.innerHTML = escapeHtml(review.textContent).replace(/\[(\d+)\]/g, '<button class="citation" onclick="citationClick($1)">[$1]</button>');
+      review.scrollTop = review.scrollHeight;
+    }
+
+    function citationClick(number) {
+      const ref = (window.reviewRefs || []).find(item => item.n === Number(number)); if (ref) focusPaper(ref.paper_id);
+    }
+
+    function updateMetrics(data) {
+      const metrics = data.metrics || {};
+      $('eval-mode').textContent = data.eval_mode || '—';
+      $('faithfulness').textContent = `${Math.round((metrics.faithfulness || 0) * 100)}%`;
+      $('context-recall').textContent = `${Math.round((metrics.context_recall || 0) * 100)}%`;
+    }
+
+    async function loadGraph(seedId) {
+      try {
+        const response = await fetch(`/api/paper/${encodeURIComponent(seedId)}`); const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || '引用图谱加载失败');
+        state.nodes = new Map(); state.edges = [];
+        addNode(data.detail, 'seed');
+        (data.references || []).forEach(paper => { addNode(paper, 'reference'); state.edges.push({source: seedId, target: paper.paper_id}); });
+        (data.citing || []).forEach(paper => { addNode(paper, 'citing'); state.edges.push({source: paper.paper_id, target: seedId}); });
+        renderGraph(seedId);
+      } catch (error) { $('citation-graph').innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`; }
+    }
+
+    function addNode(paper, kind) {
+      if (!paper || !paper.paper_id) return;
+      if (!state.nodes.has(paper.paper_id)) state.nodes.set(paper.paper_id, {...paper, kind});
+    }
+
+    function renderGraph(focusId) {
+      if (!window.echarts) { $('citation-graph').innerHTML = '<div class="empty">图谱组件加载失败，请检查 CDN 网络</div>'; return; }
+      if (!state.graph) state.graph = echarts.init($('citation-graph'));
+      state.graph.setOption({
+        animationDuration: 500,
+        tooltip: { formatter: (item) => escapeHtml(item.data?.title || item.name) },
+        series: [{ type: 'graph', layout: 'force', roam: true, draggable: true, data: [...state.nodes.values()].map(p => ({id:p.paper_id, name:(p.title||p.paper_id).slice(0, 18), title:p.title, symbolSize:p.kind==='seed'?42:26, itemStyle:{color:p.kind==='seed'?'#8ce6bd':p.kind==='reference'?'#64d5ff':'#ffb45c'}})), links: state.edges, force: {repulsion: 180, edgeLength: 100}, label: {show: true, color:'#dce9f7', fontSize:11} }]
+      });
+      state.graph.off('click'); state.graph.on('click', params => { if (params.data?.id) { focusPaper(params.data.id); loadGraph(params.data.id); } });
+    }
+
+    function focusPaper(id) {
+      document.querySelectorAll('.paper-card').forEach(card => card.classList.toggle('active', card.dataset.id === id));
+      const index = state.papers.findIndex(paper => paper.paper_id === id); if (index >= 0) $('paper-'+index)?.scrollIntoView({behavior:'smooth', block:'center'});
+      if (state.graph) state.graph.dispatchAction({type:'highlight', seriesIndex:0, dataIndex: [...state.nodes.keys()].indexOf(id)});
+    }
+  </script>
+</body>
+</html>
