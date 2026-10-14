@@ -11,7 +11,7 @@
 ├── main.py                                          # FastAPI 入口：搜索/论文详情/SSE 流式综述/评估 API
 ├── demo.ps1                                         # 一条端到端演示命令
 ├── pyproject.toml                                   # 构建/依赖/pytest 配置
-├── .env.example                                     # 环境变量模板（注意：内含一个真实样式 Key，见第六节）
+├── .env.example                                     # 环境变量模板
 ├── README.md / PROJECT_BRIEF.md / PROJECT_GUIDE.md  # 说明 / 章程 / 实施指南
 ├── config/
 │   ├── settings.py                                  # Pydantic Settings：全部配置项与默认值
@@ -30,7 +30,7 @@
 │   ├── review_service.py                            # 由已验证证据确定性生成综述与对比表
 │   ├── streaming.py                                 # 综述文本按块切分（伪流式）
 │   └── semantic_cache.py                            # 查询级持久化缓存（规范化 query+limit，带 TTL）
-├── rag/                                             # 本地全文 RAG 能力（M1/M2）
+├── rag/                                             # 本地全文 RAG 能力
 │   ├── parser.py                                    # PyMuPDF 解析 PDF 逐页文本
 │   ├── chunker.py                                   # 标题感知的段落切片（限长 + overlap）
 │   ├── hybrid_retriever.py                          # BM25 + FAISS 稠密双路召回，RRF 融合，HyDE
